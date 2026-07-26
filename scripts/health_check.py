@@ -74,16 +74,30 @@ def test(ch):
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.status
             ct = r.headers.get("Content-Type", "")
-            body = r.read(4096)
+            body = r.read(8192).strip()
             elapsed = int((time.time() - start) * 1000)
             ch["http_code"] = code
             ch["ms"] = elapsed
             ch["content_type"] = ct
-            ok = code == 200
-            if ok and ("mpegurl" in ct or "mpegURL" in ct or "hls" in ct or body[:7] == b"#EXTM3U" or ct.startswith("video/")):
+            ch["body_len"] = len(body)
+
+            is_m3u = body[:7] == b"#EXTM3U"
+            has_inf = b"#EXTINF" in body
+            is_hls_ct = "mpegurl" in ct.lower() or "hls" in ct
+
+            if code == 200 and (is_hls_ct or is_m3u):
+                if is_m3u and (has_inf or b"#EXT-X-STREAM-INF" in body):
+                    ch["working"] = True
+                    ch["quality"] = "verified"
+                elif is_hls_ct:
+                    ch["working"] = True
+                    ch["quality"] = "trusted_ct"
+                elif body:
+                    ch["working"] = True
+                    ch["quality"] = "minimal"
+            elif code == 200 and ct.startswith("video/"):
                 ch["working"] = True
-            elif ok:
-                ch["working"] = True
+                ch["quality"] = "direct_video"
     except urllib.error.HTTPError as e:
         ch["http_code"] = e.code
         ch["error"] = f"HTTP {e.code}"
