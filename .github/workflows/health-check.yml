@@ -32,32 +32,36 @@ jobs:
           WORKING=$(python3 -c "import json; print(json.load(open('output/summary.json'))['working'])")
           TOTAL=$(python3 -c "import json; print(json.load(open('output/summary.json'))['total_tested'])")
           RATE=$(python3 -c "import json; print(json.load(open('output/summary.json'))['success_rate'])")
-          DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
           echo "working=$WORKING" >> $GITHUB_OUTPUT
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
           echo "rate=$RATE" >> $GITHUB_OUTPUT
-          echo "date=$DATE" >> $GITHUB_OUTPUT
+
+      - name: Delete old release
+        run: |
+          gh release delete latest --yes 2>/dev/null || true
+          git push --delete origin latest 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: "🇮🇳 IPTV India v${{ github.run_number }} — ${{ steps.summary.outputs.working }}/${{ steps.summary.outputs.total }} (${{ steps.summary.outputs.rate }})"
+          tag_name: latest
+          name: "🇮🇳 IPTV India — ${{ steps.summary.outputs.working }}/${{ steps.summary.outputs.total }} (${{ steps.summary.outputs.rate }})"
           body: |
             ## IPTV India Channel List
+            Auto-updated every 6 hours.
 
-            - **Tested:** ${{ steps.summary.outputs.total }} channels
+            - **Tested:** ${{ steps.summary.outputs.total }}
             - **Working:** ${{ steps.summary.outputs.working }} (${{ steps.summary.outputs.rate }})
-            - **Generated:** ${{ steps.summary.outputs.date }}
+            - **Updated:** $(date -u +"%Y-%m-%d %H:%M UTC")
 
             ### 📁 Files
             - `india.m3u` — VLC-ready playlist
             - `channels_working.json` — working channels with metadata
-            - `channels.json` — all tested channels
 
-            ### 🚀 Usage
-            ```bash
-            # In VLC
+            ### 🚀 VLC / IPTV Player
+            ```
             https://github.com/${{ github.repository }}/releases/latest/download/india.m3u
             ```
           files: |
