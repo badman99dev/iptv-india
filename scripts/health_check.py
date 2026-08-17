@@ -124,7 +124,7 @@ def main():
     lived = [r for r in results if r.get("working")]
     prio = []
     try:
-        with open("hindi_bhojpuri_channels.json") as f:
+        with open("channal_order.json") as f:
             prio = [p.strip() for p in json.load(f) if isinstance(p, str) and p.strip()]
     except Exception:
         pass
