@@ -39,32 +39,48 @@ def parse(content):
     return combined
 
 HLS_CTS = {"application/vnd.apple.mpegurl", "application/x-mpegURL", "audio/mpegurl", "video/mpegurl", "video/x-mpegurl"}
+RETRY_CODES = {500, 502, 503, 504}
+RETRY_ERR = ("ssl", "unexpected_eof", "connection reset", "connection refused", "eof occurred", "remotedisconnected")
 
 def test(ch):
     url = ch["url"]
     t0 = time.time()
-    try:
+
+    def _attempt():
         req = urllib.request.Request(url, headers={"User-Agent": UA})
         with urllib.request.urlopen(req, timeout=15) as r:
             code = r.status
             ct = r.headers.get("Content-Type", "").lower().split(";")[0].strip()
             body = r.read(1024)
-            ms = int((time.time() - t0) * 1000)
+            return code, ct, body
+
+    for attempt in range(1, 3):
+        try:
+            code, ct, body = _attempt()
             ch["http_code"] = code
-            ch["ms"] = ms
+            ch["ms"] = int((time.time() - t0) * 1000)
             ch["content_type"] = ct
-            if code == 200:
-                if body[:7] == b"#EXTM3U":
-                    ch["working"] = True
-                    if ct in HLS_CTS:
-                        ch["content_type"] = ct
-                    else:
-                        ch["content_type"] = ct or "m3u8_detected"
-    except urllib.error.HTTPError as e:
-        ch["http_code"] = e.code
-        ch["content_type"] = str(e.code)
-    except Exception as e:
-        ch["error"] = str(e)[:80]
+            ch["attempts"] = attempt
+            if code == 200 and body[:7] == b"#EXTM3U":
+                ch["working"] = True
+                if ct not in HLS_CTS and ct != "":
+                    ch["content_type"] = "m3u8_detected"
+            return ch
+        except urllib.error.HTTPError as e:
+            ch["http_code"] = e.code
+            ch["content_type"] = str(e.code)
+            ch["attempts"] = attempt
+            if e.code in RETRY_CODES and attempt == 1:
+                time.sleep(1)
+                continue
+            return ch
+        except Exception as e:
+            ch["error"] = str(e)[:80]
+            errlow = str(e).lower()
+            if attempt == 1 and any(k in errlow for k in RETRY_ERR):
+                time.sleep(1)
+                continue
+            return ch
     return ch
 
 def main():
