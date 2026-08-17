@@ -54,11 +54,12 @@ def test(ch):
             ch["ms"] = ms
             ch["content_type"] = ct
             if code == 200:
-                if ct in HLS_CTS:
+                if body[:7] == b"#EXTM3U":
                     ch["working"] = True
-                elif body[:7] == b"#EXTM3U":
-                    ch["working"] = True
-                    ch["content_type"] = ct or "m3u8_detected"
+                    if ct in HLS_CTS:
+                        ch["content_type"] = ct
+                    else:
+                        ch["content_type"] = ct or "m3u8_detected"
     except urllib.error.HTTPError as e:
         ch["http_code"] = e.code
         ch["content_type"] = str(e.code)
