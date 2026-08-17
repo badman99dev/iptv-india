@@ -121,6 +121,38 @@ def main():
     working = sorted([r for r in results if r.get("working")], key=lambda x: x["name"].lower())
     dead = [r for r in results if not r.get("working")]
 
+    lived = [r for r in results if r.get("working")]
+    prio = []
+    try:
+        with open("hindi_bhojpuri_channels.json") as f:
+            prio = [p.strip() for p in json.load(f) if isinstance(p, str) and p.strip()]
+    except Exception:
+        pass
+
+    def _best(ch, p):
+        n = ch["name"].lower()
+        p = p.lower()
+        if n == p:
+            return 0
+        if n.startswith(p):
+            return 1
+        if p in n:
+            return 2
+        if n in p:
+            return 3
+        return None
+
+    top, used = [], set()
+    for p in prio:
+        match = min((ch for ch in lived if ch["name"].lower() not in used),
+                    key=lambda ch: (lambda s: s if s is not None else 99)(_best(ch, p)),
+                    default=None)
+        if match is not None and _best(match, p) is not None:
+            top.append(match)
+            used.add(match["name"].lower())
+    rest = sorted([c for c in lived if c["name"].lower() not in used], key=lambda x: x["name"].lower())
+    working = top + rest
+
     summary = {
         "scan_time": time.strftime("%Y-%m-%d %H:%M:%S"),
         "total_tested": len(results),
